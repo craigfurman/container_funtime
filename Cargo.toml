@@ -1,0 +1,6 @@
+[package]
+name = "container_funtime"
+version = "0.1.0"
+authors = ["Craig Furman <craig.furman89@gmail.com>"]
+
+[dependencies]
