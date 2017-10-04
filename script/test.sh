@@ -2,7 +2,9 @@
 set -euo pipefail
 
 (
-cd "$(dirname "$0")"/../integration_tests
+cd "$(dirname "$0")"/..
+cargo build
+cd integration_tests
 bundle install
 bundle exec rspec
 )
