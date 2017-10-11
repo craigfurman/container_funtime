@@ -30,7 +30,14 @@ fn main() {
 
 fn parent(argv: Vec<String>) {
     let user = current_user();
-    unshare_namespaces().expect("unshare");
+    unshare_namespaces(
+        &[
+            sched::CLONE_NEWUSER,
+            sched::CLONE_NEWNS,
+            sched::CLONE_NEWPID,
+            sched::CLONE_NEWUTS,
+        ],
+    ).expect("parent unshare ns");
     write_id_maps(&user).expect("write ID maps");
 
     let child_exit_status = process::Command::new(REEXEC)
@@ -46,6 +53,14 @@ fn parent(argv: Vec<String>) {
 }
 
 fn child(config: Config) {
+    mount::mount::<str, str, str, str>(
+        Some("proc"),
+        "/proc",
+        Some("proc"),
+        mount::MsFlags::empty(),
+        None,
+    ).expect("remounting /proc");
+
     let rootfs = &config.rootfs;
 
     mount::mount::<str, str, str, str>(None, "/", None, mount::MS_PRIVATE | mount::MS_REC, None)
@@ -55,11 +70,23 @@ fn child(config: Config) {
         .unwrap();
 
     let rootfs_path = path::Path::new(&config.rootfs);
-    let old_rootfs_path = rootfs_path.join("oldrootfs");
+    let oldrootfs = "oldrootfs";
+    let old_rootfs_path = rootfs_path.join(oldrootfs);
     fs::create_dir_all(&old_rootfs_path).unwrap();
+
+    mount::mount::<str, str, str, str>(
+        Some("/proc"),
+        rootfs_path.join("proc").to_str().unwrap(),
+        Some("proc"),
+        mount::MS_BIND,
+        None,
+    ).expect("bind mounting /proc");
 
     unistd::pivot_root(&rootfs_path.to_path_buf(), &old_rootfs_path).expect("pivot_root");
     env::set_current_dir("/").expect("chdir /");
+
+    mount::umount2(oldrootfs, mount::MNT_DETACH).expect("unmount old rootfs");
+    fs::remove_dir(oldrootfs).expect("deleting old rootfs mountpoint");
 
     let exit_status = run_user_process(&config.user_program, &config.user_argv)
         .expect("run user process");
@@ -102,11 +129,11 @@ fn run_user_process(user_program: &str, user_argv: &[String]) -> io::Result<proc
     user_process.wait()
 }
 
-fn unshare_namespaces() -> nix::Result<()> {
+fn unshare_namespaces(ns: &[sched::CloneFlags]) -> nix::Result<()> {
     let mut clone_flags = sched::CloneFlags::empty();
-    clone_flags.insert(sched::CLONE_NEWUSER);
-    clone_flags.insert(sched::CLONE_NEWUTS);
-    clone_flags.insert(sched::CLONE_NEWNS);
+    for clone_flag in ns {
+        clone_flags.insert(*clone_flag);
+    }
     sched::unshare(clone_flags)
 }
 

@@ -35,4 +35,14 @@ RSpec.describe 'container funtime' do
     expect(stdout).to include('NAME="Alpine Linux"'), stdout + stderr
     expect(status.exitstatus).to eq(0)
   end
+
+  it 'unmounts the old rootfs, leaving only / and /proc' do
+    stdout, stderr, status = run_containerised_process(
+      '/bin/cat', '/proc/self/mounts'
+    )
+    expect(stdout).to include('/ '), stdout + stderr
+    expect(stdout).to include('/proc '), stdout + stderr
+    expect(stdout).to_not include('/oldrootfs'), stdout + stderr
+    expect(status.exitstatus).to eq(0)
+  end
 end
