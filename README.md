@@ -1,5 +1,7 @@
 # container_funtime
 
+**Moved:** https://gitlab.com/craigfurman/container_funtime
+
 A toy container CLI, written so that I can mess about with Rust.
 
 # TODO
